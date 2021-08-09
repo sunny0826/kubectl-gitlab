@@ -1,0 +1,46 @@
+image: golang:alpine
+
+.go-cache:
+  variables:
+    GOPATH: $CI_PROJECT_DIR/.go
+  cache:
+    paths:
+      - .go/pkg/mod/
+
+variables:
+  OUTPUT_NAME: $CI_PROJECT_NAME
+
+stages:
+  - lint
+  - build
+
+before_script:
+  - echo "before_script"
+  - sed -i 's/dl-cdn.alpinelinux.org/mirrors.tuna.tsinghua.edu.cn/g' /etc/apk/repositories
+  - apk add build-base
+  - mkdir -p .go
+  - go version
+  - go env -w GO111MODULE=on
+  - go env -w GOPROXY="https://goproxy.io,direct"
+
+golangci-lint:
+  image: golangci/golangci-lint:latest-alpine
+  stage: lint
+  extends: .go-cache
+  allow_failure: true
+  script:
+    - golangci-lint run -v
+
+compile:
+  stage: build
+  extends: .go-cache
+  script:
+    - go mod download
+    #    - go build -race -o $OUTPUT_NAME
+    - go build -race -ldflags "-extldflags '-static'" -o $OUTPUT_NAME
+  artifacts:
+    paths:
+      - $OUTPUT_NAME
+
+#include:
+#  template: Security/SAST.gitlab-ci.yml
